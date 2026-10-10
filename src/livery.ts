@@ -66,39 +66,14 @@ export function heart({ cx, cy, rotate = 0, size }: Placement & { size: number }
   );
 }
 
-/**
- * Fills everything on one side of `curve` with `fill`. The curve is extended
- * straight out of both ends by `reach` pixels, then the shape is closed
- * through the `around` points, which should sit well outside the panels on
- * the side to be filled. Painting successive curves on top of each other
- * builds up the livery's swoosh of stripes.
- */
-export function regionBeyond(
-  curve: Curve,
-  fill: string,
-  around: (start: Point, end: Point) => Point[],
-  reach = 400,
-): string {
-  const [p0, p1, p2, p3] = curve;
-  const extend = (from: Point, toward: Point): Point => {
-    const dx = from[0] - toward[0];
-    const dy = from[1] - toward[1];
-    const len = Math.hypot(dx, dy) || 1;
-    return [from[0] + (dx / len) * reach, from[1] + (dy / len) * reach];
-  };
-  const start = extend(p0, p1);
-  const end = extend(p3, p2);
-  const close = around(start, end)
-    .map((p) => ` L${pt(p)}`)
-    .join("");
-  return `<path fill="${fill}" d="M${pt(start)} L${pt(p0)} C${pt(p1)} ${pt(p2)} ${pt(p3)} L${pt(end)}${close} Z"/>`;
-}
+/** A stripe's color and its width in template pixels. */
+export type Stripe = [fill: string, width: number];
 
 /**
  * The tail stripes as they cross the 737's rear fuselage, front to back:
  * yellow and red bands of equal width, outlined by silver pinstripes.
  */
-export function tailStripes(band: number, pinstripe: number): [fill: string, width: number][] {
+export function tailStripes(band: number, pinstripe: number): Stripe[] {
   return [
     [COLORS.summitSilver, pinstripe],
     [COLORS.sunriseYellow, band],
@@ -108,25 +83,77 @@ export function tailStripes(band: number, pinstripe: number): [fill: string, wid
   ];
 }
 
+const bezier = ([p0, p1, p2, p3]: Curve, t: number): Point => {
+  const u = 1 - t;
+  const [a, b, c, d] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+  return [a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]];
+};
+
+const tangent = ([p0, p1, p2, p3]: Curve, t: number): Point => {
+  const u = 1 - t;
+  const [a, b, c] = [u * u, 2 * u * t, t * t];
+  const dx = a * (p1[0] - p0[0]) + b * (p2[0] - p1[0]) + c * (p3[0] - p2[0]);
+  const dy = a * (p1[1] - p0[1]) + b * (p2[1] - p1[1]) + c * (p3[1] - p2[1]);
+  const len = Math.hypot(dx, dy) || 1;
+  return [dx / len, dy / len];
+};
+
+const smoothstep = (x: number) => {
+  const t = Math.min(Math.max(x, 0), 1);
+  return t * t * (3 - 2 * t);
+};
+
+export interface RibbonOptions {
+  /**
+   * How far along `edge` (0–1) the ribbon reaches full width. It tapers from
+   * a point at the start of the curve up to there. 0 means no taper.
+   */
+  fullAt?: number;
+  /**
+   * Points that close each band's fill, given where the extended edge starts
+   * and ends. They should sit well outside the panels, on the side the
+   * stripes stack toward.
+   */
+  around: (start: Point, end: Point) => Point[];
+}
+
 /**
- * Paints `stripes` as parallel bands. The first starts at `edge`, and each
- * band boundary after it is `edge` moved further along the unit vector
- * `step` by the widths so far. Everything past the last band goes back to
- * the body color.
+ * Paints `stripes` as a ribbon that follows `edge`. The first stripe starts
+ * on the curve and the rest stack beside it, to the right of the direction
+ * of travel, keeping their widths around bends. The ribbon runs straight on
+ * past both ends of the curve so it leaves the panels cleanly. Bands are
+ * painted one over another, finishing with the body color past the last.
  */
-export function parallelStripes(
-  edge: Curve,
-  stripes: [fill: string, width: number][],
-  step: Point,
-  around: (start: Point, end: Point) => Point[],
-): string {
-  const move = ([x, y]: Point, by: number): Point => [x + step[0] * by, y + step[1] * by];
-  const shifted = (by: number): Curve => [move(edge[0], by), move(edge[1], by), move(edge[2], by), move(edge[3], by)];
+export function ribbon(edge: Curve, stripes: Stripe[], { fullAt = 0, around }: RibbonOptions): string {
+  const steps = 96;
+  const reach = 400;
+  const boundary = (offset: number): Point[] => {
+    const points: Point[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const [x, y] = bezier(edge, t);
+      const [tx, ty] = tangent(edge, t);
+      const w = offset * (fullAt > 0 ? smoothstep(t / fullAt) : 1);
+      points.push([x - ty * w, y + tx * w]);
+    }
+    const [sx, sy] = tangent(edge, 0);
+    const [ex, ey] = tangent(edge, 1);
+    const first = points[0]!;
+    const last = points[steps]!;
+    const start: Point = [first[0] - sx * reach, first[1] - sy * reach];
+    const end: Point = [last[0] + ex * reach, last[1] + ey * reach];
+    return [start, ...points, end, ...around(start, end)];
+  };
+  const fill = (offset: number, color: string) =>
+    `<path fill="${color}" d="M${boundary(offset)
+      .map((p) => pt(p))
+      .join(" L")} Z"/>`;
+
   let offset = 0;
   let svg = "";
-  for (const [fill, width] of stripes) {
-    svg += regionBeyond(shifted(offset), fill, around);
+  for (const [color, width] of stripes) {
+    svg += fill(offset, color);
     offset += width;
   }
-  return svg + regionBeyond(shifted(offset), COLORS.boldBlue, around);
+  return svg + fill(offset, COLORS.boldBlue);
 }

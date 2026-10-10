@@ -1,7 +1,8 @@
 # tesla-southwest-wraps
 
 Digital wraps for Tesla's in-car Paint Shop, styled after the Southwest Airlines 737 "Heart" livery: a Bold Blue body
-with the white "Southwest" title, the yellow/red stripes sweeping up to the tail, and the heart on the hood.
+with the white "Southwest" title, the yellow/red tail stripes curving up over the rear wheels and across the liftgate,
+and the heart on the hood.
 
 ![Southwest wrap on a Model Y Performance](previews/modely-2025-performance.jpg)
 
