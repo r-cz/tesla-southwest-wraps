@@ -93,3 +93,40 @@ export function regionBeyond(
     .join("");
   return `<path fill="${fill}" d="M${pt(start)} L${pt(p0)} C${pt(p1)} ${pt(p2)} ${pt(p3)} L${pt(end)}${close} Z"/>`;
 }
+
+/**
+ * The tail stripes as they cross the 737's rear fuselage, front to back:
+ * yellow and red bands of equal width, outlined by silver pinstripes.
+ */
+export function tailStripes(band: number, pinstripe: number): [fill: string, width: number][] {
+  return [
+    [COLORS.summitSilver, pinstripe],
+    [COLORS.sunriseYellow, band],
+    [COLORS.summitSilver, pinstripe],
+    [COLORS.warmRed, band],
+    [COLORS.summitSilver, pinstripe],
+  ];
+}
+
+/**
+ * Paints `stripes` as parallel bands. The first starts at `edge`, and each
+ * band boundary after it is `edge` moved further along the unit vector
+ * `step` by the widths so far. Everything past the last band goes back to
+ * the body color.
+ */
+export function parallelStripes(
+  edge: Curve,
+  stripes: [fill: string, width: number][],
+  step: Point,
+  around: (start: Point, end: Point) => Point[],
+): string {
+  const move = ([x, y]: Point, by: number): Point => [x + step[0] * by, y + step[1] * by];
+  const shifted = (by: number): Curve => [move(edge[0], by), move(edge[1], by), move(edge[2], by), move(edge[3], by)];
+  let offset = 0;
+  let svg = "";
+  for (const [fill, width] of stripes) {
+    svg += regionBeyond(shifted(offset), fill, around);
+    offset += width;
+  }
+  return svg + regionBeyond(shifted(offset), COLORS.boldBlue, around);
+}

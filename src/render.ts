@@ -34,7 +34,7 @@ export async function panelMask(model: WrapModel, pixels: number): Promise<Buffe
  * How far paint bleeds past each panel outline, in pixels, so texture
  * filtering never samples the transparent gaps at panel edges.
  */
-const BLEED = 2;
+const BLEED = 1;
 
 export function templatePath(model: WrapModel): string {
   return join(ROOT, "templates", model.id, "template.png");
