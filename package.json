@@ -1,0 +1,24 @@
+{
+  "name": "tesla-southwest-wraps",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "fetch-templates": "bun scripts/fetch-templates.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "sharp": "^0.35.5",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.71.1"
+  }
+}
